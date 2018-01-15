@@ -75,4 +75,9 @@ public final class AnalyzedInsertStatement implements AnalyzedStatement {
         }
         onDuplicateKeyAssignments.values().forEach(consumer);
     }
+
+    @Override
+    public boolean isUnboundPlanningSupported() {
+        return false;
+    }
 }
