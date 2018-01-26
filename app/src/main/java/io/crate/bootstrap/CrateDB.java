@@ -96,13 +96,15 @@ public class CrateDB extends EnvironmentAwareCommand {
             throw new IllegalArgumentException("Please set the environment variable CRATE_HOME or " +
                                                "use -Cpath.home on the command-line.");
         }
-        // 2) Remove path.conf from command-line settings but use it as a conf path if exists
+        // 2) Remove "path.conf" from command-line settings but use it as a conf path if exists
+        //    We need to remove it, because it was removed in ES6, but we want to keep the ability
+        //    to set it as CLI argument and keep backwards compatibility.
         String confPathCLI = settings.remove("path.conf");
         final Path confPath;
         if (confPathCLI != null) {
             confPath = Paths.get(confPathCLI);
         } else {
-            confPath = Paths.get(crateHomePath, "conf");
+            confPath = Paths.get(crateHomePath, "config");
         }
         return CrateSettingsPreparer.prepareEnvironment(Settings.EMPTY, settings, confPath);
     }
