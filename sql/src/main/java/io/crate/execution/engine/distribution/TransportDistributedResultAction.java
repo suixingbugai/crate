@@ -24,14 +24,14 @@ package io.crate.execution.engine.distribution;
 
 import io.crate.concurrent.CompletableFutures;
 import io.crate.exceptions.ContextMissingException;
-import io.crate.execution.support.NodeAction;
-import io.crate.execution.support.NodeActionRequestHandler;
-import io.crate.execution.support.Transports;
 import io.crate.execution.jobs.DownstreamExecutionSubContext;
 import io.crate.execution.jobs.JobContextService;
 import io.crate.execution.jobs.JobExecutionContext;
 import io.crate.execution.jobs.PageBucketReceiver;
 import io.crate.execution.jobs.PageResultListener;
+import io.crate.execution.support.NodeAction;
+import io.crate.execution.support.NodeActionRequestHandler;
+import io.crate.execution.support.Transports;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.ActionListenerResponseHandler;
 import org.elasticsearch.common.component.AbstractComponent;
@@ -44,6 +44,7 @@ import org.elasticsearch.transport.TransportService;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -71,15 +72,23 @@ public class TransportDistributedResultAction extends AbstractComponent implemen
         this.executor = threadPool.executor(EXECUTOR_NAME);
         scheduler = threadPool.scheduler();
 
-        transportService.registerRequestHandler(DISTRIBUTED_RESULT_ACTION,
+        transportService.registerRequestHandler(
+            DISTRIBUTED_RESULT_ACTION,
             DistributedResultRequest::new,
             ThreadPool.Names.SAME, // <- we will dispatch later at the nodeOperation on non failures
+            true,
+            false,
             new NodeActionRequestHandler<>(this));
     }
 
     void pushResult(String node, DistributedResultRequest request, ActionListener<DistributedResultResponse> listener) {
-        transports.sendRequest(DISTRIBUTED_RESULT_ACTION, node, request, listener,
-            new ActionListenerResponseHandler<>(listener, DistributedResultResponse::new));
+        try {
+            transports.sendRequest(DISTRIBUTED_RESULT_ACTION, node, request, listener,
+                new ActionListenerResponseHandler<>(listener, DistributedResultResponse::new));
+        } catch (Throwable t) {
+            t.printStackTrace();
+            throw t;
+        }
     }
 
     @Override
@@ -92,6 +101,7 @@ public class TransportDistributedResultAction extends AbstractComponent implemen
         if (context == null) {
             return retryOrFailureResponse(request, retry);
         }
+        logger.trace("Received result for context={} phaseId={}", context, request.executionPhaseId());
 
         DownstreamExecutionSubContext executionContext;
         try {
@@ -121,9 +131,12 @@ public class TransportDistributedResultAction extends AbstractComponent implemen
                     request.isLast(),
                     pageResultListener));
                 return pageResultListener.future;
-            } catch (EsRejectedExecutionException e) {
+            } catch (RejectedExecutionException | EsRejectedExecutionException e) {
                 pageBucketReceiver.failure(request.bucketIdx(), e);
                 return CompletableFuture.completedFuture(new DistributedResultResponse(false));
+            } catch (Throwable t) {
+                t.printStackTrace();
+                throw t;
             }
         } else {
             if (request.isKilled()) {
@@ -148,7 +161,12 @@ public class TransportDistributedResultAction extends AbstractComponent implemen
                     retry, request.jobId(), delay);
             }
             NodeOperationRunnable operationRunnable = new NodeOperationRunnable(request, retry);
-            scheduler.schedule(operationRunnable::run, delay, TimeUnit.MILLISECONDS);
+            try {
+                scheduler.schedule(operationRunnable::run, delay, TimeUnit.MILLISECONDS);
+            } catch (Throwable t) {
+                t.printStackTrace();
+                throw t;
+            }
             return operationRunnable;
         }
     }

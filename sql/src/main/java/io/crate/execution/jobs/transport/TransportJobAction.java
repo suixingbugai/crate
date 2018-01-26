@@ -67,12 +67,19 @@ public class TransportJobAction implements NodeAction<JobRequest, JobResponse> {
             ACTION_NAME,
             JobRequest::new,
             EXECUTOR,
+            true,
+            true,
             new NodeActionRequestHandler<>(this));
     }
 
     public void execute(String node, final JobRequest request, final ActionListener<JobResponse> listener) {
-        transports.sendRequest(
-            ACTION_NAME, node, request, listener, new ActionListenerResponseHandler<>(listener, JobResponse::new));
+        try {
+            transports.sendRequest(
+                ACTION_NAME, node, request, listener, new ActionListenerResponseHandler<>(listener, JobResponse::new));
+        } catch (Throwable t) {
+            t.printStackTrace();
+            throw t;
+        }
     }
 
     @Override

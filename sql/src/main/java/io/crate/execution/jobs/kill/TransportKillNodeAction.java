@@ -22,10 +22,10 @@
 
 package io.crate.execution.jobs.kill;
 
+import io.crate.execution.jobs.JobContextService;
 import io.crate.execution.support.MultiActionListener;
 import io.crate.execution.support.NodeAction;
 import io.crate.execution.support.NodeActionRequestHandler;
-import io.crate.execution.jobs.JobContextService;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.ActionListenerResponseHandler;
 import org.elasticsearch.cluster.node.DiscoveryNode;
@@ -69,6 +69,8 @@ abstract class TransportKillNodeAction<Request extends TransportRequest> extends
             name,
             requestSupplier,
             ThreadPool.Names.GENERIC,
+            true,
+            false,
             new NodeActionRequestHandler<>(this));
     }
 

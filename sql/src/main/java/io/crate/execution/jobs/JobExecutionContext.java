@@ -157,12 +157,28 @@ public class JobExecutionContext implements CompletionListenable {
     }
 
     public void start() throws Throwable {
+        boolean traceEnabled = LOGGER.isTraceEnabled();
+        if (traceEnabled) {
+            LOGGER.trace("start job={} subContexts={}", jobId, subContexts.size());
+        }
         for (IntCursor id : orderedContextIds) {
             ExecutionSubContext subContext = subContexts.get(id.value);
             if (subContext == null || closed.get()) {
                 break; // got killed before start was called
             }
-            subContext.start();
+            if (traceEnabled) {
+                LOGGER.trace("start job={} subContext={}", jobId, subContext);
+            }
+            if (traceEnabled) {
+                try {
+                    subContext.start();
+                } catch (Throwable t) {
+                    LOGGER.trace("Starting job={} subContext={} failed with={}", jobId, subContext, t);
+                    throw t;
+                }
+            } else {
+                subContext.start();
+            }
         }
         if (failure != null) {
             throw failure;
