@@ -22,6 +22,7 @@
 
 package io.crate.integrationtests;
 
+import com.carrotsearch.randomizedtesting.annotations.Seed;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -44,6 +45,7 @@ public class OuterJoinIntegrationTest extends SQLTransportIntegrationTest {
     }
 
     @Test
+    @Seed("CDCA917AEF93AA86")
     public void testLeftOuterJoin() {
         // which employee works in which office?
         execute("select persons.name, offices.name from" +
